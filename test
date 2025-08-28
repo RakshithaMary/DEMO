@@ -1,0 +1,23 @@
+// OUTGOING volume (payer -> payee)
+CALL {
+  MATCH (payer:Party)-[:IS_PAYOR_OF]->(t:Transaction)<-[:IS_PAYEE_OF]-(payee:Party)
+  WITH payer, payee, count(t) AS outgoing_volume
+  MERGE (payer)-[r:OUTGOING]->(payee)
+  SET  r.volume        = outgoing_volume,
+       r.last_computed = datetime()
+  // clean up any old properties you no longer want
+  REMOVE r.total_value, r.txn_count, r.total_volume, r.txn_ids, r.first_txn, r.last_txn
+  RETURN 1
+}
+
+// INCOMING volume (payee -> payer)
+CALL {
+  MATCH (payer:Party)-[:IS_PAYOR_OF]->(t:Transaction)<-[:IS_PAYEE_OF]-(payee:Party)
+  WITH payer, payee, count(t) AS incoming_volume
+  MERGE (payee)-[r:INCOMING]->(payer)
+  SET  r.volume        = incoming_volume,
+       r.last_computed = datetime()
+  // clean up any old properties you no longer want
+  REMOVE r.total_value, r.txn_count, r.total_volume, r.txn_ids, r.first_txn, r.last_txn
+  RETURN 1
+};
