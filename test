@@ -1,16 +1,21 @@
 // Non-BMO Parties who are part of Wire transactions
-MATCH (p:Party)-[:IS_CUSTOMER_OF]->(fi:Financial_Institution)
-MATCH (p)-[:IS_PAYOR_OF|IS_PAYEE_OF]->(t:Transaction)-[:IS_A]->(pp:Payment_Product)
-WHERE toLower(pp.name) = "wire"
-  AND NOT toLower(fi.fi_name_std) CONTAINS "bmo"
-MERGE (pr:Prospect {party_id: p.party_id})
-SET   pr += properties(p);
+MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(fi:Competitor)-[:OFFERS]->(prod:Product)
+MATCH (b)-[:IS_PAYOR_OF]->(t:Transaction)-[:IS_A]->(:Payment_Product {payment_product_name: prod.name})
+MATCH (pr:Prospect)-[:IS_PAYEE_OF]->(t)-[:IS_CUSTOMER_OF]->(fi)
+WITH b, fi, prod, pr, count(t) AS txn_volume, sum(t.pmt_converted_amt_in_usd) AS txn_amount
+MERGE (prod)-[r:OUTGOING]->(pr)
+SET r.txn_volume = txn_volume,
+    r.txn_amount = txn_amount,
+    r.bmo_client = b.party_name,
+    r.competitor = fi.fi_name_std;
 
-// BMO Parties who are part of Wire transactions
-MATCH (p:Party)-[:IS_CUSTOMER_OF]->(fi:Financial_Institution)
-MATCH (p)-[:IS_PAYOR_OF|IS_PAYEE_OF]->(t:Transaction)-[:IS_A]->(pp:Payment_Product)
-WHERE toLower(pp.name) = "wire"
-  AND toLower(fi.fi_name_std) CONTAINS "bmo"
-MERGE (c:BMO_Client {party_id: p.party_id})
-SET   c += properties(p);
 
+MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(fi:Competitor)-[:OFFERS]->(prod:Product)
+MATCH (pr:Prospect)-[:IS_PAYOR_OF]->(t:Transaction)-[:IS_A]->(:Payment_Product {payment_product_name: prod.name})
+MATCH (b)-[:IS_PAYEE_OF]->(t)-[:IS_CUSTOMER_OF]->(fi)
+WITH b, fi, prod, pr, count(t) AS txn_volume, sum(t.pmt_converted_amt_in_usd) AS txn_amount
+MERGE (pr)-[r:INCOMING]->(prod)
+SET r.txn_volume = txn_volume,
+    r.txn_amount = txn_amount,
+    r.bmo_client = b.party_name,
+    r.competitor = fi.fi_name_std;
