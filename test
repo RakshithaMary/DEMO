@@ -1,3 +1,26 @@
+// Any Party whose FI is not BMO Harris
+MATCH (p:Party)-[:IS_CUSTOMER_OF]->(fi:Financial_Institution)
+WHERE NOT toLower(fi.fi_name_std) CONTAINS "bmo harris"
+MERGE (pr:Prospect {party_id: p.party_id})
+SET   pr += properties(p);
+
+// Reconnect Prospect to FI
+MATCH (p:Party)-[:IS_CUSTOMER_OF]->(fi:Financial_Institution)
+WHERE NOT toLower(fi.fi_name_std) CONTAINS "bmo harris"
+MATCH (pr:Prospect {party_id: p.party_id})
+MERGE (pr)-[:IS_CUSTOMER_OF]->(fi);
+
+// Reconnect Prospect to Transactions
+MATCH (p:Party)-[:IS_PAYOR_OF]->(t:Transaction)
+MATCH (pr:Prospect {party_id: p.party_id})
+MERGE (pr)-[:IS_PAYOR_OF]->(t);
+
+MATCH (p:Party)-[:IS_PAYEE_OF]->(t:Transaction)
+MATCH (pr:Prospect {party_id: p.party_id})
+MERGE (pr)-[:IS_PAYEE_OF]->(t);
+
+----------
+
 MATCH (p:Party)-[:IS_CUSTOMER_OF]->(fi:Financial_Institution)
 WHERE toLower(fi.fi_name_std) CONTAINS "bmo harris"
 
