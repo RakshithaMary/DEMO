@@ -1,20 +1,50 @@
-MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(fi:Competitor)-[:OFFERS]->(pp:Payment_Product)
-MATCH (b)-[:IS_PAYOR_OF]->(t:Transaction)-[:IS_A]->(pp)
-MATCH (pr:Prospect)-[:IS_PAYEE_OF]->(t)-[:IS_CUSTOMER_OF]->(fi)
-WITH b, fi, pp, pr, count(t) AS txn_volume, sum(t.pmt_converted_amt_in_usd) AS txn_amount
-MERGE (pp)-[r:OUTGOING]->(pr)
-SET r.txn_volume   = txn_volume,
-    r.txn_amount   = txn_amount,
-    r.bmo_client   = b.party_name,
-    r.competitor   = fi.fi_name_std;
+def get_node_properties(self, node_id: str) -> dict | None:
+    """
+    Fetches all properties for a single node given its element ID.
+    If node is Product or Prospect, also fetch chain context (BMO_Client, Competitor).
+    """
+    try:
+        with self.driver.session() as session:
+            # First fetch the node and labels
+            query = "MATCH (n) WHERE elementId(n) = $node_id RETURN n, labels(n) AS labels"
+            params = {"node_id": node_id}
+            record = session.run(query, params).single()
 
-MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(fi:Competitor)-[:OFFERS]->(pp:Payment_Product)
-MATCH (pr:Prospect)-[:IS_PAYOR_OF]->(t:Transaction)-[:IS_A]->(pp)
-MATCH (b)-[:IS_PAYEE_OF]->(t)-[:IS_CUSTOMER_OF]->(fi)
-WITH b, fi, pp, pr, count(t) AS txn_volume, sum(t.pmt_converted_amt_in_usd) AS txn_amount
-MERGE (pr)-[r:INCOMING]->(pp)
-SET r.txn_volume   = txn_volume,
-    r.txn_amount   = txn_amount,
-    r.bmo_client   = b.party_name,
-    r.competitor   = fi.fi_name_std;
+            if not record:
+                return None
+
+            node = dict(record["n"].items())
+            labels = record["labels"]
+
+            # If Product, also get BMO_Client + Competitor
+            if "Product" in labels:
+                query = """
+                MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(c:Competitor)-[:OFFERS]->(p:Product)
+                WHERE elementId(p) = $node_id
+                RETURN b.party_name AS bmo_client, c.fi_name_std AS competitor
+                """
+                ctx = session.run(query, params).single()
+                if ctx:
+                    node["bmo_client"] = ctx["bmo_client"]
+                    node["competitor"] = ctx["competitor"]
+
+            # If Prospect, also get Product + Competitor + BMO_Client
+            if "Prospect" in labels:
+                query = """
+                MATCH (b:BMO_Client)-[:HAS_COMPETITOR]->(c:Competitor)-[:OFFERS]->(p:Product)-[:USED_BY]->(pr:Prospect)
+                WHERE elementId(pr) = $node_id
+                RETURN b.party_name AS bmo_client, c.fi_name_std AS competitor, p.payment_product_name AS product
+                """
+                ctx = session.run(query, params).single()
+                if ctx:
+                    node["bmo_client"] = ctx["bmo_client"]
+                    node["competitor"] = ctx["competitor"]
+                    node["product"] = ctx["product"]
+
+            return node
+
+    except Exception as e:
+        logger.error(f"An exception occurred fetching properties for node {node_id}", exc_info=True)
+        return None
+
 
