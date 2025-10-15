@@ -121,3 +121,83 @@ document.getElementById('download-table-btn')
         .addEventListener('click', downloadTableAsCSV);
 
 
+-------
+
+
+js
+
+function appendToStaticTable(element, props) {
+    const tbody = document.querySelector('#data-table tbody');
+    if (!tbody) return;
+
+    const isNode = element.isNode();
+    const type = element.data('label') || (isNode ? 'Node' : 'Edge');
+    const name = props[currentQuery.caption_property] || props.name || 'N/A';
+
+    // --- Build a mini "property table" layout ---
+    let propRows = Object.entries(props)
+        .map(([key, value]) => {
+            // Format value nicely
+            if (key.toLowerCase().includes('amount') && typeof value === 'number') {
+                value = value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            } else if (typeof value === 'number') {
+                value = value.toLocaleString('en-US');
+            } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                try {
+                    const date = new Date(value);
+                    value = date.toLocaleDateString('en-US', { timeZone: 'UTC' });
+                } catch {}
+            }
+            return `<tr><td class="prop-key">${key}</td><td class="prop-value">${value}</td></tr>`;
+        })
+        .join('');
+
+    const propTable = `
+        <table class="inner-props-table">
+            <tbody>${propRows}</tbody>
+        </table>
+    `;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${type}</td>
+        <td>${name}</td>
+        <td>${propTable}</td>
+    `;
+    tbody.appendChild(row);
+
+    // Keep this for export feature
+    clickedElementsData.push({
+        type,
+        name,
+        ...props
+    });
+}
+-----
+css 
+
+/* Inner table inside the Properties column */
+.inner-props-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+.inner-props-table td {
+    padding: 2px 6px;
+    vertical-align: top;
+    border-bottom: 1px solid #eee;
+}
+
+.inner-props-table .prop-key {
+    font-weight: 600;
+    color: #003366;
+    width: 40%;
+}
+
+.inner-props-table .prop-value {
+    color: #333;
+    width: 60%;
+    word-break: break-word;
+}
