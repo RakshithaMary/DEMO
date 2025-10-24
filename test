@@ -1,219 +1,32 @@
-let clickedElementsData = []; // stores properties of clicked nodes/edges
+neo4j_query = """
+UNWIND $data AS item
 
-function appendToStaticTable(element, props) {
-    const tbody = document.querySelector('#data-table tbody');
-    if (!tbody) return;
+// determine flow
+WITH item,
+     CASE WHEN item.payor_or_payee = 'PAYOR' THEN 'Sent' ELSE 'Received' END AS flowDir
 
-    const isNode = element.isNode();
-    const type = element.data('label') || (isNode ? 'Node' : 'Edge');
-    const name = props[currentQuery.caption_property] || props.name || 'N/A';
+// match all dimension nodes (they already exist)
+MATCH (c:Client {clientId: item.client_id})
+MATCH (dp:DepositProduct {name: item.dep_product})
+MATCH (f:Flow {direction: flowDir})
+MATCH (ch:Channel {name: item.channel})
+MATCH (pp:PaymentProduct {name: item.payment_product})
+MATCH (fi:FinancialInstitution {name: item.fi_name})
+MATCH (p:Prospect {prospectId: item.prospect_id})
 
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${type}</td>
-        <td>${name}</td>
-        <td>${JSON.stringify(props)}</td>
-    `;
-    tbody.appendChild(row);
+// create one aggregated transaction node
+CREATE (agg:AggTxn {
+    totalAmount: item.total_amount,
+    txCount: item.total_volume,
+    monthId: item.month_id
+})
 
-    // store data for export
-    clickedElementsData.push({
-        type,
-        name,
-        ...props
-    });
-}
-
-
------------
-
-
-function downloadTableAsCSV() {
-    if (clickedElementsData.length === 0) {
-        alert("No data to download yet.");
-        return;
-    }
-
-    const headers = Object.keys(clickedElementsData[0]);
-    const csvRows = [headers.join(",")];
-
-    clickedElementsData.forEach(row => {
-        const values = headers.map(header => {
-            let val = row[header];
-            if (typeof val === 'object') val = JSON.stringify(val).replace(/,/g, ';');
-            if (val === null || val === undefined) val = '';
-            return `"${val}"`;
-        });
-        csvRows.push(values.join(","));
-    });
-
-    const csvData = csvRows.join("\n");
-    const blob = new Blob([csvData], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "graph_elements_data.csv";
-    a.click();
-    window.URL.revokeObjectURL(url);
-}
-----------------
-
-
-document.getElementById('download-table-btn').addEventListener('click', downloadTableAsCSV);
-
-
--------------
-
-<div class="data-table-container">
-    <div id="data-table-summary" class="data-table-summary">
-        <div id="breadcrumb-trail" class="breadcrumb-container"></div>
-        <div id="summary-totals" class="summary-totals"></div>
-    </div>
-
-    <!-- ✅ Add this new section here -->
-    <div class="download-controls">
-        <button id="download-table-btn" class="btn">
-            <i class="fa fa-download"></i> Download Table
-        </button>
-    </div>
-    <!-- ✅ End of new section -->
-
-    <div class="table-wrapper">
-        <table id="data-table">
-            <thead>
-                <tr>
-                    <th>Type</th>
-                    <th>Name</th>
-                    <th>Properties</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-</div>
-
-
---------
-
-.download-controls {
-    text-align: right;
-    margin: 10px 0;
-}
-
-.download-controls .btn {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.download-controls .btn:hover {
-    background-color: #0056b3;
-}
-
------
-
-document.getElementById('download-table-btn')
-        .addEventListener('click', downloadTableAsCSV);
-
-
--------
-
-
-js
-
-function appendToStaticTable(element, props) {
-    const tbody = document.querySelector('#data-table tbody');
-    if (!tbody) return;
-
-    const isNode = element.isNode();
-    const type = element.data('label') || (isNode ? 'Node' : 'Edge');
-    const name = props[currentQuery.caption_property] || props.name || 'N/A';
-
-    // --- Build a mini "property table" layout ---
-    let propRows = Object.entries(props)
-        .map(([key, value]) => {
-            // Format value nicely
-            if (key.toLowerCase().includes('amount') && typeof value === 'number') {
-                value = value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-            } else if (typeof value === 'number') {
-                value = value.toLocaleString('en-US');
-            } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                try {
-                    const date = new Date(value);
-                    value = date.toLocaleDateString('en-US', { timeZone: 'UTC' });
-                } catch {}
-            }
-            return `<tr><td class="prop-key">${key}</td><td class="prop-value">${value}</td></tr>`;
-        })
-        .join('');
-
-    const propTable = `
-        <table class="inner-props-table">
-            <tbody>${propRows}</tbody>
-        </table>
-    `;
-
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${type}</td>
-        <td>${name}</td>
-        <td>${propTable}</td>
-    `;
-    tbody.appendChild(row);
-
-    // Keep this for export feature
-    clickedElementsData.push({
-        type,
-        name,
-        ...props
-    });
-}
------
-css 
-
-/* --- Inner Properties Table (for static data table) --- */
-.inner-props-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 4px;
-    font-size: 13px;
-    background-color: #fafafa;
-    border: 1px solid #eee;
-    border-radius: 4px;
-}
-
-.inner-props-table td {
-    padding: 3px 8px;
-    border-bottom: 1px solid #eee;
-    vertical-align: top;
-}
-
-.inner-props-table tr:last-child td {
-    border-bottom: none;
-}
-
-.inner-props-table .prop-key {
-    font-weight: 600;
-    color: #003366;
-    width: 40%;
-    text-align: left;
-    white-space: nowrap;
-}
-
-.inner-props-table .prop-value {
-    color: #333;
-    width: 60%;
-    text-align: left;
-    word-break: break-word;
-}
-
-/* Optional: make it visually distinct inside the main table */
-#data-table td > .inner-props-table {
-    margin-top: 6px;
-    box-shadow: inset 0 0 4px rgba(0,0,0,0.05);
-}
+// create relationships
+MERGE (agg)-[:FOR_CLIENT]->(c)
+MERGE (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+MERGE (agg)-[:FOR_FLOW]->(f)
+MERGE (agg)-[:FOR_CHANNEL]->(ch)
+MERGE (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
+MERGE (agg)-[:FOR_FI]->(fi)
+MERGE (agg)-[:FOR_PROSPECT]->(p)
+"""
