@@ -1,32 +1,67 @@
-neo4j_query = """
-UNWIND $data AS item
+// Define a test report table showing totals at each hierarchy level
+WITH [i IN range(0, 2) | substring(toString(date() - duration({months: i})), 0, 7)] AS validMonths
 
-// determine flow
-WITH item,
-     CASE WHEN item.payor_or_payee = 'PAYOR' THEN 'Sent' ELSE 'Received' END AS flowDir
+// Step 1: Compute total at CLIENT level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+WHERE agg.monthId IN validMonths
+WITH c.clientId AS levelKey, 'Client' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
 
-// match all dimension nodes (they already exist)
-MATCH (c:Client {clientId: item.client_id})
-MATCH (dp:DepositProduct {name: item.dep_product})
-MATCH (f:Flow {direction: flowDir})
-MATCH (ch:Channel {name: item.channel})
-MATCH (pp:PaymentProduct {name: item.payment_product})
-MATCH (fi:FinancialInstitution {name: item.fi_name})
-MATCH (p:Prospect {prospectId: item.prospect_id})
+// Step 2: Compute total at DEPOSIT PRODUCT level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name AS levelKey, 'DepositProduct' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
 
-// create one aggregated transaction node
-CREATE (agg:AggTxn {
-    totalAmount: item.total_amount,
-    txCount: item.total_volume,
-    monthId: item.month_id
-})
+// Step 3: FLOW level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name + '|' + f.direction AS levelKey, 'Flow' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
 
-// create relationships
-MERGE (agg)-[:FOR_CLIENT]->(c)
-MERGE (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-MERGE (agg)-[:FOR_FLOW]->(f)
-MERGE (agg)-[:FOR_CHANNEL]->(ch)
-MERGE (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
-MERGE (agg)-[:FOR_FI]->(fi)
-MERGE (agg)-[:FOR_PROSPECT]->(p)
-"""
+// Step 4: CHANNEL level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name AS levelKey, 'Channel' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
+
+// Step 5: PAYMENT PRODUCT level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
+MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name AS levelKey, 'PaymentProduct' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
+
+// Step 6: FINANCIAL INSTITUTION level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
+MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
+MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name AS levelKey, 'FinancialInstitution' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+UNION ALL
+
+// Step 7: PROSPECT level
+MATCH (agg:AggTx)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
+MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
+MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
+MATCH (agg)-[:FOR_PROSPECT]->(p:Prospect)
+WHERE agg.monthId IN validMonths
+WITH c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name + '|' + p.name AS levelKey, 'Prospect' AS level, sum(agg.totalAmount) AS totalAmount, sum(agg.txCount) AS txCount
+
+RETURN level, count(*) AS combinations, sum(totalAmount) AS totalAmount, sum(txCount) AS txCount
+ORDER BY level;
