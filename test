@@ -1,33 +1,70 @@
-// --- CLIENT ---
-CREATE CONSTRAINT client_id_unique IF NOT EXISTS
-FOR (c:Client) REQUIRE c.clientId IS UNIQUE;
+WITH [(i IN range(0,2) |
+        substring(date() - duration({months: i}), 0, 7)
+     )] AS validMonths
 
-// --- DEPOSIT PRODUCT ---
-CREATE INDEX deposit_product_name_idx IF NOT EXISTS
-FOR (ap:DepositProduct) ON (ap.name);
+MATCH (agg:AggTx)
+MATCH (agg)-[:FOR_CLIENT]->(c:Client)
+MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
+MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
+MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
+MATCH (agg)-[:FOR_PROSPECT]->(p:Prospect)
+WHERE agg.monthId IN validMonths
 
-// --- FLOW ---
-CREATE INDEX flow_dir_idx IF NOT EXISTS
-FOR (f:Flow) ON (f.direction);
+WITH agg, c, dp, f, ch, pp, fi, p,
 
-// --- CHANNEL ---
-CREATE INDEX channel_name_idx IF NOT EXISTS
-FOR (ch:Channel) ON (ch.name);
+[
+    {
+        level: 'Client',
+        levelKey: c.clientId,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'DepositProduct',
+        levelKey: c.clientId + '|' + dp.name,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'Flow',
+        levelKey: c.clientId + '|' + dp.name + '|' + f.direction,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'Channel',
+        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'PaymentProduct',
+        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'FinancialInstitution',
+        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    },
+    {
+        level: 'Prospect',
+        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name + '|' + p.name,
+        totalAmount: agg.totalAmount,
+        txCount: agg.txCount
+    }
+] AS rows
 
-// --- PAYMENT PRODUCT ---
-CREATE INDEX payment_product_nm_idx IF NOT EXISTS
-FOR (pp:PaymentProduct) ON (pp.name);
+UNWIND rows AS r
 
-// --- FINANCIAL INSTITUTION ---
-CREATE INDEX fi_name_idx IF NOT EXISTS
-FOR (fi:FinancialInstitution) ON (fi.name);
-
-// --- PROSPECT ---
-CREATE CONSTRAINT prospect_id_unique IF NOT EXISTS
-FOR (p:Prospect) REQUIRE p.prospectId IS UNIQUE;
-
-// --- AGGTX (composite index) ---
-CREATE INDEX aggTx_composite_idx IF NOT EXISTS
-FOR (a:AggTx)
-ON (a.monthId, a.client_id, a.account_product_id, a.payment_product_nm,
-    a.flow, a.txn_channel, a.prospect_fi_id, a.prospect_id);
+RETURN 
+    r.level,
+    r.levelKey,
+    sum(r.totalAmount) AS totalAmount,
+    sum(r.txCount) AS txCount,
+    count(*) AS combinations
+ORDER BY r.level;
