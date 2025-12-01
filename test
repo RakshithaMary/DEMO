@@ -1,70 +1,20 @@
-WITH [(i IN range(0,2) |
-        substring(date() - duration({months: i}), 0, 7)
-     )] AS validMonths
+from pyspark.sql import functions as F
 
-MATCH (agg:AggTx)
-MATCH (agg)-[:FOR_CLIENT]->(c:Client)
-MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
-MATCH (agg)-[:FOR_FLOW]->(f:Flow)
-MATCH (agg)-[:FOR_CHANNEL]->(ch:Channel)
-MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
-MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
-MATCH (agg)-[:FOR_PROSPECT]->(p:Prospect)
-WHERE agg.monthId IN validMonths
+# 1. Total count of Unknown prospect_fi_id
+unknown_total = (
+    df.filter(F.col("prospect_fi_id") == "Unknown")
+      .count()
+)
 
-WITH agg, c, dp, f, ch, pp, fi, p,
+print("Total Unknown prospect_fi_id:", unknown_total)
 
-[
-    {
-        level: 'Client',
-        levelKey: c.clientId,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'DepositProduct',
-        levelKey: c.clientId + '|' + dp.name,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'Flow',
-        levelKey: c.clientId + '|' + dp.name + '|' + f.direction,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'Channel',
-        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'PaymentProduct',
-        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'FinancialInstitution',
-        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    },
-    {
-        level: 'Prospect',
-        levelKey: c.clientId + '|' + dp.name + '|' + f.direction + '|' + ch.name + '|' + pp.name + '|' + fi.name + '|' + p.name,
-        totalAmount: agg.totalAmount,
-        txCount: agg.txCount
-    }
-] AS rows
 
-UNWIND rows AS r
+# 2. Distribution by payment_product_nm
+unknown_dist = (
+    df.filter(F.col("prospect_fi_id") == "Unknown")
+      .groupBy("payment_product_nm")
+      .agg(F.count("*").alias("unknown_count"))
+      .orderBy(F.desc("unknown_count"))
+)
 
-RETURN 
-    r.level,
-    r.levelKey,
-    sum(r.totalAmount) AS totalAmount,
-    sum(r.txCount) AS txCount,
-    count(*) AS combinations
-ORDER BY r.level;
+unknown_dist.show(100, truncate=False)
