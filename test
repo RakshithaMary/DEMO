@@ -1,20 +1,212 @@
-from pyspark.sql import functions as F
+Yep — here’s a clean **documentation template** you can copy into a `README.md` (or Confluence) for your Knowledge Graph Explorer. I’ll keep it focused on:
 
-# 1. Total count of Unknown prospect_fi_id
-unknown_total = (
-    df.filter(F.col("prospect_fi_id") == "Unknown")
-      .count()
-)
+* **Database server**
+* **Server link + all packages**
+* **Environment documentation**
 
-print("Total Unknown prospect_fi_id:", unknown_total)
+> Important: don’t put real passwords in docs. Use placeholders and point to your secret manager / vault / secure note.
 
+---
 
-# 2. Distribution by payment_product_nm
-unknown_dist = (
-    df.filter(F.col("prospect_fi_id") == "Unknown")
-      .groupBy("payment_product_nm")
-      .agg(F.count("*").alias("unknown_count"))
-      .orderBy(F.desc("unknown_count"))
-)
+# Knowledge Graph Explorer — Environment & Server Documentation
 
-unknown_dist.show(100, truncate=False)
+## 1) Overview
+
+This project is a web-based Knowledge Graph Explorer with:
+
+* **Backend:** FastAPI (Uvicorn) + Neo4j driver
+* **Frontend:** Static HTML/JS UI (Cytoscape visualization + results table + CSV download)
+* **Database:** Neo4j (remote server)
+
+---
+
+## 2) Database Server Details
+
+### Neo4j Server
+
+* **Host:** `neojocbplapp001.srv.bmogc.net`
+* **Port:** `7701`
+* **Protocol / Scheme:** `bolt+s` (TLS enabled)
+* **Database name:** `usb2bgraphstg` *(example — update if different)*
+
+### Connection URI
+
+```text
+bolt+s://neojocbplapp001.srv.bmogc.net:7701
+```
+
+### Authentication
+
+* **Username:** `<your-neo4j-username>`
+* **Password:** `<stored-securely-not-in-docs>`
+
+### Network / Access Notes
+
+* VPN required: ✅/❌
+* IP allowlist required: ✅/❌
+* TLS certificates required: ✅/❌
+* Neo4j Browser available: ✅/❌ (link below)
+
+### Neo4j Browser / Bloom Links (if applicable)
+
+* Neo4j Browser: `<link>`
+* Neo4j Bloom: `<link>`
+
+---
+
+## 3) Application Server Links
+
+### Backend Server
+
+* Base URL: `http://127.0.0.1:8000` (local)
+* Swagger UI: `http://127.0.0.1:8000/docs`
+* OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
+
+### Frontend
+
+* Local file / served URL:
+
+  * Option A (static file): `<path-to-index.html>`
+  * Option B (served): `http://127.0.0.1:<port>/`
+
+---
+
+## 4) Environment Configuration
+
+### .env Location
+
+* File: `backend/.env`
+
+### Required Variables
+
+```env
+NEO4J_URI="bolt+s://neojocbplapp001.srv.bmogc.net:7701"
+NEO4J_USER="<username>"
+NEO4J_PASSWORD="<password>"
+NEO4J_DATABASE="usb2bgraphstg"
+```
+
+### Notes / Gotchas
+
+* Keep **no spaces** around `=` in `.env`
+
+  * ✅ `KEY="value"`
+  * ❌ `KEY= "value"`
+* Keep URI in **quotes**.
+
+---
+
+## 5) Local Setup
+
+### Prerequisites
+
+* Python: `3.10+` (or your required version)
+* Node: optional (only if you build frontend assets)
+* Access to Neo4j server (VPN / permissions)
+
+### Clone + Install
+
+```bash
+git clone <repo-url>
+cd knowledge-graph-explorer-main
+python -m venv .venv
+source .venv/bin/activate  # mac/linux
+# .venv\Scripts\activate   # windows
+
+pip install -r backend/requirements.txt
+```
+
+### Run Backend
+
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+### Run Frontend
+
+* Open `index.html` directly OR run a static server:
+
+```bash
+python -m http.server 3000
+```
+
+---
+
+## 6) Packages & Dependencies
+
+### Backend (Python) — Key Packages
+
+Document what you actually use; typical ones are:
+
+* `fastapi`
+* `uvicorn`
+* `neo4j`
+* `python-dotenv` (if used)
+* `pydantic`
+
+**Install command**
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+**To generate full dependency list**
+
+```bash
+pip freeze > backend/requirements_lock.txt
+```
+
+### Frontend (JS/CSS)
+
+* Cytoscape.js (graph rendering)
+* FontAwesome (icons)
+* Any table / CSV utilities (if used)
+
+---
+
+## 7) CSV Download Behavior (Important)
+
+* Default backend behavior sets:
+
+  * `limit = 10` if the UI doesn’t send a limit
+* UI should send `limit` from `#limit-input` so:
+
+  * CSV downloads **all displayed records** (same limit)
+
+---
+
+## 8) Troubleshooting
+
+### “SyntaxError: invalid syntax bolt+s://…”
+
+Cause: URI parsed incorrectly (often from bad `.env` formatting or `eval()` usage).
+Fix:
+
+* Quote URI in `.env`
+* Ensure settings loader reads env vars as **strings** (no `eval()`)
+
+### CSV downloads only 10 rows
+
+Cause: backend default `limit=10` is used.
+Fix:
+
+* Ensure UI sends updated `limit` on search + download.
+
+---
+
+## 9) Security / Compliance
+
+* Do **not** commit `.env` files
+* Store secrets in approved secret manager / vault
+* Use least privilege Neo4j credentials (read-only if possible)
+* Document who owns access approvals and how to request them
+
+---
+
+If you want, paste (or screenshot) your **repo structure** + the contents of:
+
+* `backend/requirements.txt`
+* where your backend loads env vars (settings/config file)
+
+…and I’ll convert this into a polished, final README customized to your exact project (with correct endpoints, package list, and run steps).
