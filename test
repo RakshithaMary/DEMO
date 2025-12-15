@@ -1,33 +1,96 @@
-Yep — here’s a clean **documentation template** you can copy into a `README.md` (or Confluence) for your Knowledge Graph Explorer. I’ll keep it focused on:
+Perfect — for a **new server request**, what your infra / platform / IT team usually wants is **formal, audit-ready documentation**, not code-level notes.
 
-* **Database server**
-* **Server link + all packages**
-* **Environment documentation**
-
-> Important: don’t put real passwords in docs. Use placeholders and point to your secret manager / vault / secure note.
+Below is a **server-request–ready document** you can submit (or paste into a ticket / Confluence / Word / PDF).
+I’ve written it in a **professional enterprise tone**, aligned with banking / regulated environments.
 
 ---
 
-# Knowledge Graph Explorer — Environment & Server Documentation
+# Knowledge Graph Explorer
 
-## 1) Overview
-
-This project is a web-based Knowledge Graph Explorer with:
-
-* **Backend:** FastAPI (Uvicorn) + Neo4j driver
-* **Frontend:** Static HTML/JS UI (Cytoscape visualization + results table + CSV download)
-* **Database:** Neo4j (remote server)
+## Server Hosting & Environment Request Documentation
 
 ---
 
-## 2) Database Server Details
+## 1. Purpose of the Request
 
-### Neo4j Server
+This document provides the technical and operational details required to provision a **new application server** for hosting the **Knowledge Graph Explorer** application.
+The application enables users to visualize, explore, and export relationship-based data stored in a Neo4j graph database.
 
+---
+
+## 2. Application Overview
+
+### Application Name
+
+**Knowledge Graph Explorer**
+
+### Application Type
+
+* Web-based analytical application
+* Read-only data exploration and export
+
+### High-Level Architecture
+
+* **Frontend:** Static web application (HTML / JavaScript)
+* **Backend:** Python FastAPI application (Uvicorn ASGI server)
+* **Database:** Neo4j graph database (remote)
+
+---
+
+## 3. Hosting Model Requested
+
+### Server Type
+
+* **Application Server**
+* Backend and frontend hosted on the same server
+
+### Environment
+
+* ☐ Development
+* ☐ Test
+* ☑ **Staging / UAT**
+* ☐ Production
+
+*(Select as applicable)*
+
+---
+
+## 4. Server Specifications (Recommended)
+
+| Component        | Requirement                                   |
+| ---------------- | --------------------------------------------- |
+| Operating System | Linux (RHEL / Amazon Linux / Ubuntu LTS)      |
+| CPU              | 4 vCPU (minimum)                              |
+| Memory           | 16 GB RAM (recommended)                       |
+| Disk             | 50–100 GB                                     |
+| Python Version   | 3.10+                                         |
+| Node.js          | Optional (only if frontend build is required) |
+| Network          | Outbound connectivity to Neo4j server         |
+
+---
+
+## 5. Application Ports & Access
+
+| Component   | Port     | Protocol     | Direction |
+| ----------- | -------- | ------------ | --------- |
+| Backend API | 8000     | HTTP         | Inbound   |
+| Frontend UI | 80 / 443 | HTTP / HTTPS | Inbound   |
+| Neo4j DB    | 7701     | Bolt+s       | Outbound  |
+
+---
+
+## 6. Database Server Details
+
+### Database Type
+
+**Neo4j (Graph Database)**
+
+### Connection Details
+
+* **Protocol:** `bolt+s`
 * **Host:** `neojocbplapp001.srv.bmogc.net`
 * **Port:** `7701`
-* **Protocol / Scheme:** `bolt+s` (TLS enabled)
-* **Database name:** `usb2bgraphstg` *(example — update if different)*
+* **Database Name:** `usb2bgraphstg`
 
 ### Connection URI
 
@@ -37,176 +100,128 @@ bolt+s://neojocbplapp001.srv.bmogc.net:7701
 
 ### Authentication
 
-* **Username:** `<your-neo4j-username>`
-* **Password:** `<stored-securely-not-in-docs>`
+* Username: Application-specific service account
+* Password: Stored securely (not hardcoded)
 
-### Network / Access Notes
+### Security
 
-* VPN required: ✅/❌
-* IP allowlist required: ✅/❌
-* TLS certificates required: ✅/❌
-* Neo4j Browser available: ✅/❌ (link below)
-
-### Neo4j Browser / Bloom Links (if applicable)
-
-* Neo4j Browser: `<link>`
-* Neo4j Bloom: `<link>`
+* TLS-encrypted connection
+* Credentials stored via environment variables / secret manager
+* No database write operations performed by application
 
 ---
 
-## 3) Application Server Links
+## 7. Application Configuration (Environment Variables)
 
-### Backend Server
+The application is configured using environment variables stored outside source control.
 
-* Base URL: `http://127.0.0.1:8000` (local)
-* Swagger UI: `http://127.0.0.1:8000/docs`
-* OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
-
-### Frontend
-
-* Local file / served URL:
-
-  * Option A (static file): `<path-to-index.html>`
-  * Option B (served): `http://127.0.0.1:<port>/`
-
----
-
-## 4) Environment Configuration
-
-### .env Location
-
-* File: `backend/.env`
-
-### Required Variables
+### Required Environment Variables
 
 ```env
 NEO4J_URI="bolt+s://neojocbplapp001.srv.bmogc.net:7701"
-NEO4J_USER="<username>"
-NEO4J_PASSWORD="<password>"
+NEO4J_USER="<service-account>"
+NEO4J_PASSWORD="<secure-password>"
 NEO4J_DATABASE="usb2bgraphstg"
 ```
 
-### Notes / Gotchas
+### Configuration Notes
 
-* Keep **no spaces** around `=` in `.env`
-
-  * ✅ `KEY="value"`
-  * ❌ `KEY= "value"`
-* Keep URI in **quotes**.
+* No secrets are committed to source control
+* Environment variables loaded at runtime
+* Credentials can be rotated without redeploying code
 
 ---
 
-## 5) Local Setup
+## 8. Software Dependencies
 
-### Prerequisites
+### Backend (Python)
 
-* Python: `3.10+` (or your required version)
-* Node: optional (only if you build frontend assets)
-* Access to Neo4j server (VPN / permissions)
+* fastapi
+* uvicorn
+* neo4j
+* pydantic
+* python-dotenv (if applicable)
 
-### Clone + Install
-
-```bash
-git clone <repo-url>
-cd knowledge-graph-explorer-main
-python -m venv .venv
-source .venv/bin/activate  # mac/linux
-# .venv\Scripts\activate   # windows
-
-pip install -r backend/requirements.txt
-```
-
-### Run Backend
+Dependencies installed via:
 
 ```bash
-cd backend
-uvicorn app.main:app --reload
+pip install -r requirements.txt
 ```
 
-### Run Frontend
+### Frontend
 
-* Open `index.html` directly OR run a static server:
-
-```bash
-python -m http.server 3000
-```
-
----
-
-## 6) Packages & Dependencies
-
-### Backend (Python) — Key Packages
-
-Document what you actually use; typical ones are:
-
-* `fastapi`
-* `uvicorn`
-* `neo4j`
-* `python-dotenv` (if used)
-* `pydantic`
-
-**Install command**
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-**To generate full dependency list**
-
-```bash
-pip freeze > backend/requirements_lock.txt
-```
-
-### Frontend (JS/CSS)
-
-* Cytoscape.js (graph rendering)
+* Cytoscape.js (graph visualization)
 * FontAwesome (icons)
-* Any table / CSV utilities (if used)
+* Native JavaScript / HTML / CSS
 
 ---
 
-## 7) CSV Download Behavior (Important)
+## 9. Application Start & Run
 
-* Default backend behavior sets:
+### Backend Startup
 
-  * `limit = 10` if the UI doesn’t send a limit
-* UI should send `limit` from `#limit-input` so:
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
-  * CSV downloads **all displayed records** (same limit)
+### Frontend Hosting
 
----
+* Static files served via:
 
-## 8) Troubleshooting
-
-### “SyntaxError: invalid syntax bolt+s://…”
-
-Cause: URI parsed incorrectly (often from bad `.env` formatting or `eval()` usage).
-Fix:
-
-* Quote URI in `.env`
-* Ensure settings loader reads env vars as **strings** (no `eval()`)
-
-### CSV downloads only 10 rows
-
-Cause: backend default `limit=10` is used.
-Fix:
-
-* Ensure UI sends updated `limit` on search + download.
+  * Nginx / Apache OR
+  * Python static server
 
 ---
 
-## 9) Security / Compliance
+## 10. Security & Compliance Considerations
 
-* Do **not** commit `.env` files
-* Store secrets in approved secret manager / vault
-* Use least privilege Neo4j credentials (read-only if possible)
-* Document who owns access approvals and how to request them
+* Read-only access to Neo4j
+* No PII modification
+* No credentials stored in code
+* TLS enforced for database connectivity
+* Access controlled via network and server-level permissions
 
 ---
 
-If you want, paste (or screenshot) your **repo structure** + the contents of:
+## 11. Monitoring & Logging (Optional)
 
-* `backend/requirements.txt`
-* where your backend loads env vars (settings/config file)
+* Application logs via stdout / file logging
+* Can integrate with centralized logging if required
+* Health check available via FastAPI endpoint
 
-…and I’ll convert this into a polished, final README customized to your exact project (with correct endpoints, package list, and run steps).
+---
+
+## 12. Support & Ownership
+
+| Area        | Owner                       |
+| ----------- | --------------------------- |
+| Application | Knowledge Graph Team        |
+| Database    | Neo4j Platform Team         |
+| Server      | Infrastructure / Cloud Team |
+
+---
+
+## 13. Summary of Request
+
+We request provisioning of a **new application server** with the specifications outlined above to host the Knowledge Graph Explorer.
+The server will host a Python FastAPI backend and a static frontend, connecting securely to an existing Neo4j database.
+
+---
+
+### ✅ Next Steps
+
+* Approve server provisioning
+* Assign hostname and IP
+* Configure network access to Neo4j
+* Deploy application binaries and environment variables
+
+---
+
+If you want, I can:
+
+* Convert this into **PDF / Word format**
+* Customize wording to your **internal infra template**
+* Add **Production-grade HA / SSL / Nginx details**
+* Add a **one-page executive summary** for leadership approval
+
+Just tell me what your infra team usually asks for.
