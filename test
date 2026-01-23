@@ -1,38 +1,64 @@
-Python Runtime Details
+from pyspark.sql import functions as F
 
-Python Version: 3.10.x (minimum)
+jan_sel = jan_df.select(
+    F.col("client_id").alias("jan_client_id"),
+    F.col("account_number").alias("account_number"),
+    F.col("account_product_id").alias("account_product_id"),
+    F.col("balance").alias("jan_balance")
+)
 
-Runtime: CPython
+dec_sel = dec_df.select(
+    F.col("client_id").alias("dec_client_id"),
+    F.col("account_number").ali
+as("account_number"),
+    F.col("account_product_id").alias("account_product_id"),
+    F.col("balance").alias("dec_balance")
+)
 
-Framework: FastAPI
 
-Server: Uvicorn (ASGI)
 
-Environment
 
-Python virtual environment (venv)
+joined_df = (
+    balance_df.alias("b")
+    .join(
+        jan_sel.alias("j"),
+        on=["account_number", "account_product_id", "client_id"],
+        how="left"
+    )
+    .join(
+        dec_sel.alias("d"),
+        on=["account_number", "account_product_id", "client_id"],
+        how="left"
+    )
+)
 
-Dependencies installed via pip using requirements.txt
 
-Startup Command
-uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-Key Packages
 
-fastapi
 
-uvicorn
+final_df = joined_df.withColumn(
+    "monthly_balance_diff",
+    F.col("jan_balance") - F.col("dec_balance")
+)
 
-neo4j
 
-pydantic
 
-python-dotenv
 
-Configuration
+final_df = final_df.withColumn(
+    "diff_vs_account_balance",
+    F.col("monthly_balance_diff") - F.col("account_balance")
+)
 
-Runtime configuration via environment variables
 
-No credentials hardcoded in source code
 
-TLS-enabled Neo4j connection
+final_df.select(
+    "client_id",
+    "account_number",
+    "account_product_id",
+    "account_balance",
+    "jan_balance",
+    "dec_balance",
+    "monthly_balance_diff",
+    "diff_vs_account_balance"
+).show(50, truncate=False)
+
