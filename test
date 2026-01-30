@@ -1,35 +1,5 @@
-from pyspark.sql import functions as F
 
-final_df = final_df.withColumn("abs_diff", F.abs(F.col("diff_vs_account_balance")))
-
-final_df = final_df.withColumn(
-    "diff_bucket",
-    F.when(F.col("abs_diff") == 0, "0")
-     .when(F.col("abs_diff") <= 1, "<=1")
-     .when(F.col("abs_diff") <= 10, "<=10")
-     .when(F.col("abs_diff") <= 100, "<=100")
-     .when(F.col("abs_diff") <= 1000, "<=1000")
-     .when(F.col("abs_diff") <= 10000, "<=10000")
-     .otherwise(">10000")
-)
-
-
-
-summary_df = (
-    final_df.groupBy("account_product_id", "diff_bucket")
-    .count()
-)
-summary_df.show(50, truncate=False)
-
-
-pivot_df = (
-    summary_df.groupBy("account_product_id")
-    .pivot("diff_bucket", ["0", "<=1", "<=10", "<=100", "<=1000", "<=10000", ">10000"])
-    .sum("count")
     .fillna(0)
-)
-
-pivot_df.show(50, truncate=False)
 
 
 
