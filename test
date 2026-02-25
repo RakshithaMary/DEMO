@@ -1,5 +1,66 @@
+2.
 
-    .fillna(0)
+
+queries.forEach(query => {
+  const listItem = document.createElement('li');
+  listItem.dataset.queryName = query.name;
+  listItem.innerHTML = ` ${query.display_name} <div class="nav-item-desc">${query.description}</div> `;
+
+  listItem.addEventListener('click', () => {
+    // Select view only (no fetch)
+    currentQuery = query;
+    setActiveQueryKey(query.name);
+
+    // UI updates
+    queryTitle.textContent = query.display_name;
+
+    // highlight selected
+    document.querySelectorAll('#query-list li').forEach(li => li.classList.remove('active'));
+    listItem.classList.add('active');
+
+    // Reset screen to empty state
+    cy.elements().remove();
+    populateDataTable([], []);
+    propertiesTitle.textContent = "Properties";
+    propertiesPanel.innerHTML = `<p>Click Search to load results.</p>`;
+  });
+
+  queryList.appendChild(listItem);
+});
+
+
+
+
+3. 
+
+function showEmptyState(message = "Select a Relationship View and click Search.") {
+  // Clear graph + table
+  cy.elements().remove();
+  populateDataTable([], []);
+
+  // Reset side panel
+  propertiesTitle.textContent = "Properties";
+  propertiesPanel.innerHTML = `<p>${message}</p>`;
+
+  // Reset header title
+  queryTitle.textContent = "Knowledge Graph Explorer";
+}
+
+
+4.
+
+async function startApp() {
+  showLoader();
+  await updateHeaderInfo();
+  await populateNav();
+  hideLoader();
+
+  showEmptyState("Select a Relationship View and click Search.");
+}
+
+
+5.
+
 
 
 
