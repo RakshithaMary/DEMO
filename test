@@ -1,66 +1,216 @@
-2.
+client_360_view:
+  display_name: "Client 360 View"
+  description: "Aggregated drill-down from Client to Prospect."
+  enabled: true
+  caption_property: "display_name"
+  mapping:
+    node_size: "totalAmount"
+    edge_weight: "txCount"
 
+  colors:
+    Client: "#0079c1"
+    DepositProduct: "#f6bd16"
+    Flow: "#61ddaa"
+    PaymentProduct: "#f08bb4"
+    FinancialInstitution: "#78d3f8"
+    Prospect: "#f6903d"
 
-queries.forEach(query => {
-  const listItem = document.createElement('li');
-  listItem.dataset.queryName = query.name;
-  listItem.innerHTML = ` ${query.display_name} <div class="nav-item-desc">${query.description}</div> `;
+  table_display:
+    _default: ["name", "totalAmount", "txCount"]
 
-  listItem.addEventListener('click', () => {
-    // Select view only (no fetch)
-    currentQuery = query;
-    setActiveQueryKey(query.name);
+  # -----------------------------
+  # TABLE QUERY (start from Client, use cutoffMonth)
+  # -----------------------------
+  table_query: >
+    WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+    MATCH (c:Client)
+    WHERE ($text_search IS NULL OR c.name CONTAINS $text_search OR c.clientId = $text_search)
+    MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)
+    WHERE agg.monthId >= cutoffMonth
+    MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+    MATCH (agg)-[:FOR_FLOW]->(f)
+    MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
+    MATCH (agg)-[:FOR_FI]->(fi)
+    MATCH (agg)-[:FOR_PROSPECT]->(p)
+    RETURN
+      c.name AS Client,
+      dp.name AS DepProduct,
+      f.direction AS Flow,
+      pp.name AS PayProduct,
+      fi.name AS FI,
+      p.name AS Prospect,
+      agg.monthId AS Month,
+      agg.totalAmount AS totalAmount,
+      agg.txCount AS txCount
+    ORDER BY agg.totalAmount DESC
+    LIMIT toInteger($limit)
 
-    // UI updates
-    queryTitle.textContent = query.display_name;
+  # -----------------------------
+  # PRIMARY (no SET; return virtual Client node with computed props)
+  # -----------------------------
+  primary: >
+    WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+    MATCH (n:Client)
+    WHERE ($text_search IS NULL OR n.name CONTAINS $text_search OR n.clientId = $text_search)
+    OPTIONAL MATCH (n)<-[:FOR_CLIENT]-(agg:AggTx)
+    WHERE agg.monthId >= cutoffMonth
+    WITH n,
+         coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+         coalesce(sum(agg.txCount), 0) AS txCount
+    CALL apoc.create.vNode(
+      labels(n),
+      apoc.map.merge(properties(n), {
+        totalAmount: totalAmount,
+        txCount: txCount,
+        display_name: n.name + ' (' + toString(txCount) + ' txns)'
+      })
+    ) YIELD node AS vn
+    RETURN vn
+    ORDER BY totalAmount DESC
+    LIMIT toInteger($limit)
 
-    // highlight selected
-    document.querySelectorAll('#query-list li').forEach(li => li.classList.remove('active'));
-    listItem.classList.add('active');
+  neighbors:
+    # -----------------------------
+    # DEFAULT: Client -> DepositProduct
+    # -----------------------------
+    _default: >
+      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+      MATCH (c:Client)
+      WHERE elementId(c) = $node_id
+      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
+      WHERE agg.monthId >= cutoffMonth
+      WITH c, dp,
+           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+           coalesce(sum(agg.txCount), 0) AS txCount
+      CALL apoc.create.vNode(
+        labels(dp),
+        apoc.map.merge(properties(dp), {
+          totalAmount: totalAmount,
+          txCount: txCount,
+          display_name: dp.name + ' (' + toString(txCount) + ' txns)'
+        })
+      ) YIELD node AS vdp
+      CALL apoc.create.vRelationship(c, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vdp) YIELD rel
+      RETURN c, rel, vdp
 
-    // Reset screen to empty state
-    cy.elements().remove();
-    populateDataTable([], []);
-    propertiesTitle.textContent = "Properties";
-    propertiesPanel.innerHTML = `<p>Click Search to load results.</p>`;
-  });
+    # -----------------------------
+    # DepositProduct -> Flow
+    # -----------------------------
+    DepositProduct: >
+      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+      MATCH (c:Client)
+      WHERE elementId(c) = $Client_node_id
+      MATCH (dp:DepositProduct)
+      WHERE elementId(dp) = $node_id
+      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+      MATCH (agg)-[:FOR_FLOW]->(f:Flow)
+      WHERE agg.monthId >= cutoffMonth
+      WITH dp, f,
+           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+           coalesce(sum(agg.txCount), 0) AS txCount
+      CALL apoc.create.vNode(
+        labels(f),
+        apoc.map.merge(properties(f), {
+          totalAmount: totalAmount,
+          txCount: txCount,
+          display_name: f.direction + ' (' + toString(txCount) + ' txns)'
+        })
+      ) YIELD node AS vf
+      CALL apoc.create.vRelationship(dp, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vf) YIELD rel
+      RETURN dp, rel, vf
 
-  queryList.appendChild(listItem);
-});
+    # -----------------------------
+    # Flow -> PaymentProduct
+    # -----------------------------
+    Flow: >
+      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+      MATCH (c:Client)
+      WHERE elementId(c) = $Client_node_id
+      MATCH (dp:DepositProduct)
+      WHERE elementId(dp) = $DepositProduct_node_id
+      MATCH (f:Flow)
+      WHERE elementId(f) = $node_id
+      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+      MATCH (agg)-[:FOR_FLOW]->(f)
+      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
+      WHERE agg.monthId >= cutoffMonth
+      WITH f, pp,
+           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+           coalesce(sum(agg.txCount), 0) AS txCount
+      CALL apoc.create.vNode(
+        labels(pp),
+        apoc.map.merge(properties(pp), {
+          totalAmount: totalAmount,
+          txCount: txCount,
+          display_name: pp.name + ' (' + toString(txCount) + ' txns)'
+        })
+      ) YIELD node AS vpp
+      CALL apoc.create.vRelationship(f, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vpp) YIELD rel
+      RETURN f, rel, vpp
 
+    # -----------------------------
+    # PaymentProduct -> FinancialInstitution
+    # -----------------------------
+    PaymentProduct: >
+      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+      MATCH (c:Client)
+      WHERE elementId(c) = $Client_node_id
+      MATCH (dp:DepositProduct)
+      WHERE elementId(dp) = $DepositProduct_node_id
+      MATCH (f:Flow)
+      WHERE elementId(f) = $Flow_node_id
+      MATCH (pp:PaymentProduct)
+      WHERE elementId(pp) = $node_id
+      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+      MATCH (agg)-[:FOR_FLOW]->(f)
+      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
+      MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
+      WHERE agg.monthId >= cutoffMonth
+      WITH pp, fi,
+           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+           coalesce(sum(agg.txCount), 0) AS txCount
+      CALL apoc.create.vNode(
+        labels(fi),
+        apoc.map.merge(properties(fi), {
+          totalAmount: totalAmount,
+          txCount: txCount,
+          display_name: fi.name + ' (' + toString(txCount) + ' txns)'
+        })
+      ) YIELD node AS vfi
+      CALL apoc.create.vRelationship(pp, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vfi) YIELD rel
+      RETURN pp, rel, vfi
 
-
-
-3. 
-
-function showEmptyState(message = "Select a Relationship View and click Search.") {
-  // Clear graph + table
-  cy.elements().remove();
-  populateDataTable([], []);
-
-  // Reset side panel
-  propertiesTitle.textContent = "Properties";
-  propertiesPanel.innerHTML = `<p>${message}</p>`;
-
-  // Reset header title
-  queryTitle.textContent = "Knowledge Graph Explorer";
-}
-
-
-4.
-
-async function startApp() {
-  showLoader();
-  await updateHeaderInfo();
-  await populateNav();
-  hideLoader();
-
-  showEmptyState("Select a Relationship View and click Search.");
-}
-
-
-5.
-
-
-
-
+    # -----------------------------
+    # FinancialInstitution -> Prospect
+    # -----------------------------
+    FinancialInstitution: >
+      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
+      MATCH (c:Client)
+      WHERE elementId(c) = $Client_node_id
+      MATCH (dp:DepositProduct)
+      WHERE elementId(dp) = $DepositProduct_node_id
+      MATCH (f:Flow)
+      WHERE elementId(f) = $Flow_node_id
+      MATCH (pp:PaymentProduct)
+      WHERE elementId(pp) = $PaymentProduct_node_id
+      MATCH (fi:FinancialInstitution)
+      WHERE elementId(fi) = $node_id
+      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
+      MATCH (agg)-[:FOR_FLOW]->(f)
+      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
+      MATCH (agg)-[:FOR_FI]->(fi)
+      MATCH (agg)-[:FOR_PROSPECT]->(p:Prospect)
+      WHERE agg.monthId >= cutoffMonth
+      WITH fi, p,
+           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
+           coalesce(sum(agg.txCount), 0) AS txCount
+      CALL apoc.create.vNode(
+        labels(p),
+        apoc.map.merge(properties(p), {
+          totalAmount: totalAmount,
+          txCount: txCount,
+          display_name: p.name + ' (' + toString(txCount) + ' txns)'
+        })
+      ) YIELD node AS vp
+      CALL apoc.create.vRelationship(fi, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vp) YIELD rel
+      RETURN fi, rel, vp
