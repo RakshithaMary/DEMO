@@ -1,216 +1,24 @@
-client_360_view:
-  display_name: "Client 360 View"
-  description: "Aggregated drill-down from Client to Prospect."
-  enabled: true
-  caption_property: "display_name"
-  mapping:
-    node_size: "totalAmount"
-    edge_weight: "txCount"
-
-  colors:
-    Client: "#0079c1"
-    DepositProduct: "#f6bd16"
-    Flow: "#61ddaa"
-    PaymentProduct: "#f08bb4"
-    FinancialInstitution: "#78d3f8"
-    Prospect: "#f6903d"
-
-  table_display:
-    _default: ["name", "totalAmount", "txCount"]
-
-  # -----------------------------
-  # TABLE QUERY (start from Client, use cutoffMonth)
-  # -----------------------------
-  table_query: >
-    WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-    MATCH (c:Client)
-    WHERE ($text_search IS NULL OR c.name CONTAINS $text_search OR c.clientId = $text_search)
-    MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)
-    WHERE agg.monthId >= cutoffMonth
-    MATCH (agg)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-    MATCH (agg)-[:FOR_FLOW]->(f)
-    MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
-    MATCH (agg)-[:FOR_FI]->(fi)
-    MATCH (agg)-[:FOR_PROSPECT]->(p)
-    RETURN
-      c.name AS Client,
-      dp.name AS DepProduct,
-      f.direction AS Flow,
-      pp.name AS PayProduct,
-      fi.name AS FI,
-      p.name AS Prospect,
-      agg.monthId AS Month,
-      agg.totalAmount AS totalAmount,
-      agg.txCount AS txCount
-    ORDER BY agg.totalAmount DESC
-    LIMIT toInteger($limit)
-
-  # -----------------------------
-  # PRIMARY (no SET; return virtual Client node with computed props)
-  # -----------------------------
-  primary: >
-    WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-    MATCH (n:Client)
-    WHERE ($text_search IS NULL OR n.name CONTAINS $text_search OR n.clientId = $text_search)
-    OPTIONAL MATCH (n)<-[:FOR_CLIENT]-(agg:AggTx)
-    WHERE agg.monthId >= cutoffMonth
-    WITH n,
-         coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-         coalesce(sum(agg.txCount), 0) AS txCount
-    CALL apoc.create.vNode(
-      labels(n),
-      apoc.map.merge(properties(n), {
-        totalAmount: totalAmount,
-        txCount: txCount,
-        display_name: n.name + ' (' + toString(txCount) + ' txns)'
-      })
-    ) YIELD node AS vn
-    RETURN vn
-    ORDER BY totalAmount DESC
-    LIMIT toInteger($limit)
-
-  neighbors:
-    # -----------------------------
-    # DEFAULT: Client -> DepositProduct
-    # -----------------------------
-    _default: >
-      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-      MATCH (c:Client)
-      WHERE elementId(c) = $node_id
-      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp:DepositProduct)
-      WHERE agg.monthId >= cutoffMonth
-      WITH c, dp,
-           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-           coalesce(sum(agg.txCount), 0) AS txCount
-      CALL apoc.create.vNode(
-        labels(dp),
-        apoc.map.merge(properties(dp), {
-          totalAmount: totalAmount,
-          txCount: txCount,
-          display_name: dp.name + ' (' + toString(txCount) + ' txns)'
-        })
-      ) YIELD node AS vdp
-      CALL apoc.create.vRelationship(c, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vdp) YIELD rel
-      RETURN c, rel, vdp
-
-    # -----------------------------
-    # DepositProduct -> Flow
-    # -----------------------------
-    DepositProduct: >
-      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-      MATCH (c:Client)
-      WHERE elementId(c) = $Client_node_id
-      MATCH (dp:DepositProduct)
-      WHERE elementId(dp) = $node_id
-      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-      MATCH (agg)-[:FOR_FLOW]->(f:Flow)
-      WHERE agg.monthId >= cutoffMonth
-      WITH dp, f,
-           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-           coalesce(sum(agg.txCount), 0) AS txCount
-      CALL apoc.create.vNode(
-        labels(f),
-        apoc.map.merge(properties(f), {
-          totalAmount: totalAmount,
-          txCount: txCount,
-          display_name: f.direction + ' (' + toString(txCount) + ' txns)'
-        })
-      ) YIELD node AS vf
-      CALL apoc.create.vRelationship(dp, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vf) YIELD rel
-      RETURN dp, rel, vf
-
-    # -----------------------------
-    # Flow -> PaymentProduct
-    # -----------------------------
-    Flow: >
-      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-      MATCH (c:Client)
-      WHERE elementId(c) = $Client_node_id
-      MATCH (dp:DepositProduct)
-      WHERE elementId(dp) = $DepositProduct_node_id
-      MATCH (f:Flow)
-      WHERE elementId(f) = $node_id
-      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-      MATCH (agg)-[:FOR_FLOW]->(f)
-      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp:PaymentProduct)
-      WHERE agg.monthId >= cutoffMonth
-      WITH f, pp,
-           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-           coalesce(sum(agg.txCount), 0) AS txCount
-      CALL apoc.create.vNode(
-        labels(pp),
-        apoc.map.merge(properties(pp), {
-          totalAmount: totalAmount,
-          txCount: txCount,
-          display_name: pp.name + ' (' + toString(txCount) + ' txns)'
-        })
-      ) YIELD node AS vpp
-      CALL apoc.create.vRelationship(f, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vpp) YIELD rel
-      RETURN f, rel, vpp
-
-    # -----------------------------
-    # PaymentProduct -> FinancialInstitution
-    # -----------------------------
-    PaymentProduct: >
-      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-      MATCH (c:Client)
-      WHERE elementId(c) = $Client_node_id
-      MATCH (dp:DepositProduct)
-      WHERE elementId(dp) = $DepositProduct_node_id
-      MATCH (f:Flow)
-      WHERE elementId(f) = $Flow_node_id
-      MATCH (pp:PaymentProduct)
-      WHERE elementId(pp) = $node_id
-      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-      MATCH (agg)-[:FOR_FLOW]->(f)
-      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
-      MATCH (agg)-[:FOR_FI]->(fi:FinancialInstitution)
-      WHERE agg.monthId >= cutoffMonth
-      WITH pp, fi,
-           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-           coalesce(sum(agg.txCount), 0) AS txCount
-      CALL apoc.create.vNode(
-        labels(fi),
-        apoc.map.merge(properties(fi), {
-          totalAmount: totalAmount,
-          txCount: txCount,
-          display_name: fi.name + ' (' + toString(txCount) + ' txns)'
-        })
-      ) YIELD node AS vfi
-      CALL apoc.create.vRelationship(pp, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vfi) YIELD rel
-      RETURN pp, rel, vfi
-
-    # -----------------------------
-    # FinancialInstitution -> Prospect
-    # -----------------------------
-    FinancialInstitution: >
-      WITH substring(toString(date() - duration({months: toInteger($months) - 1})), 0, 7) AS cutoffMonth
-      MATCH (c:Client)
-      WHERE elementId(c) = $Client_node_id
-      MATCH (dp:DepositProduct)
-      WHERE elementId(dp) = $DepositProduct_node_id
-      MATCH (f:Flow)
-      WHERE elementId(f) = $Flow_node_id
-      MATCH (pp:PaymentProduct)
-      WHERE elementId(pp) = $PaymentProduct_node_id
-      MATCH (fi:FinancialInstitution)
-      WHERE elementId(fi) = $node_id
-      MATCH (c)<-[:FOR_CLIENT]-(agg:AggTx)-[:FOR_DEPOSIT_PRODUCT]->(dp)
-      MATCH (agg)-[:FOR_FLOW]->(f)
-      MATCH (agg)-[:FOR_PAYMENT_PRODUCT]->(pp)
-      MATCH (agg)-[:FOR_FI]->(fi)
-      MATCH (agg)-[:FOR_PROSPECT]->(p:Prospect)
-      WHERE agg.monthId >= cutoffMonth
-      WITH fi, p,
-           coalesce(sum(agg.totalAmount), 0) AS totalAmount,
-           coalesce(sum(agg.txCount), 0) AS txCount
-      CALL apoc.create.vNode(
-        labels(p),
-        apoc.map.merge(properties(p), {
-          totalAmount: totalAmount,
-          txCount: txCount,
-          display_name: p.name + ' (' + toString(txCount) + ' txns)'
-        })
-      ) YIELD node AS vp
-      CALL apoc.create.vRelationship(fi, 'AGG_TO', {totalAmount: totalAmount, txCount: txCount}, vp) YIELD rel
-      RETURN fi, rel, vp
+Phase	Task	Subtask	Priority	Status	Owner	Start Date	End Date	Comments
+Setup & Validation	Environment Setup	Validate Neo4j URI configuration	High					
+Setup & Validation	Environment Setup	Verify .env file accessibility	High					
+Setup & Validation	Environment Setup	Update config.py for env variables	High					
+Setup & Validation	DB Connectivity	Test DB connection	High					
+Setup & Validation	DB Connectivity	Validate schema visibility	Medium					
+Pipeline & Data Engineering	Data Ingestion	Validate ingestion jobs	High					
+Pipeline & Data Engineering	Data Ingestion	Check missing/null values	High					
+Pipeline & Data Engineering	Pipeline Refresh	Understand refresh logic	High					
+Pipeline & Data Engineering	Pipeline Refresh	Design refresh workflow in Dataiku	High					
+Pipeline & Data Engineering	Automation	Test automated refresh	Medium					
+Optimization	Query Performance	Identify slow queries	High					
+Optimization	Query Performance	Analyze execution plans	High					
+Optimization	Indexing	Create indexes on Client/Transaction/Industry	High					
+Optimization	Graph Optimization	Optimize Cypher queries	High					
+Graph Analytics & Visualization	Cytoscape View	Create industry-level client view	High					
+Graph Analytics & Visualization	Cytoscape View	Build industry-to-industry connectivity	High					
+Graph Analytics & Visualization	Cytoscape View	Implement money flow visualization	High					
+Graph Analytics & Visualization	Validation	Validate aggregation and direction	Medium					
+Documentation	Project Docs	Document B2B US UDM overview	High					
+Documentation	Schema Docs	Document nodes & relationships	High					
+Documentation	Pipeline Docs	Document Dataiku flows	Medium					
+Documentation	Use Cases	Document analytics use cases	Medium					
+				
