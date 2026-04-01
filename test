@@ -1,24 +1,43 @@
-Phase	Task	Subtask	Priority	Status	Owner	Start Date	End Date	Comments
-Setup & Validation	Environment Setup	Validate Neo4j URI configuration	High					
-Setup & Validation	Environment Setup	Verify .env file accessibility	High					
-Setup & Validation	Environment Setup	Update config.py for env variables	High					
-Setup & Validation	DB Connectivity	Test DB connection	High					
-Setup & Validation	DB Connectivity	Validate schema visibility	Medium					
-Pipeline & Data Engineering	Data Ingestion	Validate ingestion jobs	High					
-Pipeline & Data Engineering	Data Ingestion	Check missing/null values	High					
-Pipeline & Data Engineering	Pipeline Refresh	Understand refresh logic	High					
-Pipeline & Data Engineering	Pipeline Refresh	Design refresh workflow in Dataiku	High					
-Pipeline & Data Engineering	Automation	Test automated refresh	Medium					
-Optimization	Query Performance	Identify slow queries	High					
-Optimization	Query Performance	Analyze execution plans	High					
-Optimization	Indexing	Create indexes on Client/Transaction/Industry	High					
-Optimization	Graph Optimization	Optimize Cypher queries	High					
-Graph Analytics & Visualization	Cytoscape View	Create industry-level client view	High					
-Graph Analytics & Visualization	Cytoscape View	Build industry-to-industry connectivity	High					
-Graph Analytics & Visualization	Cytoscape View	Implement money flow visualization	High					
-Graph Analytics & Visualization	Validation	Validate aggregation and direction	Medium					
-Documentation	Project Docs	Document B2B US UDM overview	High					
-Documentation	Schema Docs	Document nodes & relationships	High					
-Documentation	Pipeline Docs	Document Dataiku flows	Medium					
-Documentation	Use Cases	Document analytics use cases	Medium					
-				
+
+
+
+
+
+
+## **Phase 1 – Setup, Data Ingestion & Documentation**
+
+*(Nov 2025 – Feb 2026)*
+
+• Validate **Neo4j environment configuration, connectivity, and access**
+• Set up and verify **API endpoints, routing paths, and response handling**
+• Enable **application logging, monitoring, and error handling mechanisms**
+• Ingest and load **1 year of historical US payments data into Neo4j**
+• Perform **data validation, consistency checks, and schema alignment**
+• Initiate **documentation for UDM, Dataiku pipelines, and graph schema**
+
+
+
+## **Phase 2 – Graph Analytics & Visualization**
+
+*(Feb 2026 – May 2026)*
+
+• Build **industry-level graph visualization views using Cytoscape**
+• Develop **industry-to-industry connectivity and network relationships**
+• Implement **money flow visualization across industries**
+• Develop and refine **Cypher queries for graph exploration and analysis**
+• Configure **graph explorer queries and reusable views**
+• Validate **transaction aggregation logic and flow direction (incoming/outgoing)**
+
+
+
+## **Phase 3 – Optimization, Automation & Stabilization**
+
+*(Jun 2026 – Oct 31, 2026)*
+
+• Identify and resolve **slow Cypher queries impacting performance**
+• Analyze **query execution plans and optimize traversal patterns**
+• Create and maintain **indexes for improved query performance**
+• Optimize **graph schema and relationships for scalability**
+• Implement **Dataiku pipeline refresh and automated data workflows**
+• Complete **documentation and monitor system performance in production**
+
