@@ -1,43 +1,37 @@
+Got it — here’s a stronger, more filled-out version with solid points under **Previous Week’s Work** while keeping everything aligned with what you’ve actually done:
 
+---
 
+**Review of Previous Week’s Work**
 
+* Progressed work on data validation pipelines in line with the Wires POC, ensuring consistency in data quality checks and outputs.
+* Generated and reviewed **data quality artifacts** such as completeness, uniqueness, and basic profiling to validate dataset reliability.
+* Performed **initial exploratory data analysis (EDA)** on transaction data, focusing on trends in volumes and values over time.
+* Analyzed **temporal patterns** (monthly and weekly trends) to identify spikes, seasonality, and anomalies.
+* Began **graph-based exploration in Neo4j**, understanding node relationships and overall data structure.
+* Computed **basic graph metrics** including node connectivity and degree distributions to establish a foundation for deeper analysis.
 
+---
 
+**Current Task Updates**
 
-## **Phase 1 – Setup, Data Ingestion & Documentation**
+* Currently working on **EDA using Neo4j**.
+* Computed **in-degree and out-degree metrics** for all nodes to understand connectivity patterns.
+* Performing deeper analysis using **graph algorithms (Louvain community detection)** to identify clusters of similar entities and uncover relationship patterns.
 
-*(Nov 2025 – Feb 2026)*
+---
 
-• Validate **Neo4j environment configuration, connectivity, and access**
-• Set up and verify **API endpoints, routing paths, and response handling**
-• Enable **application logging, monitoring, and error handling mechanisms**
-• Ingest and load **1 year of historical US payments data into Neo4j**
-• Perform **data validation, consistency checks, and schema alignment**
-• Initiate **documentation for UDM, Dataiku pipelines, and graph schema**
+**Planning for Upcoming Tasks**
 
+* Next step is to **review and validate the EDA findings** with the team.
+* Post-review, we will begin work on the **embedding model**, with guidance from Bo.
 
+---
 
-## **Phase 2 – Graph Analytics & Visualization**
+**Challenges, Risks, and Blockers**
 
-*(Feb 2026 – May 2026)*
+* No major blockers currently; awaiting EDA review to proceed to the next phase.
 
-• Build **industry-level graph visualization views using Cytoscape**
-• Develop **industry-to-industry connectivity and network relationships**
-• Implement **money flow visualization across industries**
-• Develop and refine **Cypher queries for graph exploration and analysis**
-• Configure **graph explorer queries and reusable views**
-• Validate **transaction aggregation logic and flow direction (incoming/outgoing)**
+---
 
-
-
-## **Phase 3 – Optimization, Automation & Stabilization**
-
-*(Jun 2026 – Oct 31, 2026)*
-
-• Identify and resolve **slow Cypher queries impacting performance**
-• Analyze **query execution plans and optimize traversal patterns**
-• Create and maintain **indexes for improved query performance**
-• Optimize **graph schema and relationships for scalability**
-• Implement **Dataiku pipeline refresh and automated data workflows**
-• Complete **documentation and monitor system performance in production**
-
+If you want, I can make this sound more *impact-focused (manager-level)* or add *metrics/scale (like 20M records, performance, etc.)* which usually makes it more impressive in meetings.
